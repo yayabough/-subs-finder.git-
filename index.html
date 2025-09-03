@@ -1,0 +1,770 @@
+<!-- ==========================
+FILE: index.html
+Subscriptions Finder – PWA (offline, no upload)
+Adds: Savings banner, smarter weird-payments, cancel-assist, trust modal, nicer UI, inline logo.
+========================== -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subscriptions Finder – Offline (PWA)</title>
+  <meta name="theme-color" content="#0f172a" />
+  <base href="./">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- PDF.js (cached offline after first load) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded',()=>{
+      if (window['pdfjsLib']) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      }
+    });
+  </script>
+  <style>
+    :root{
+      --ink:#e5e7eb; --muted:#93a0c7; --bg:#0b1020; --card:#121a35;
+      --accent:#0ea5e9; --good:#10b981; --warn:#f59e0b; --bad:#ef4444;
+      --ink-dim:#cbd5e1;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:16px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(180deg,#0b1020,#0e1731);color:var(--ink)}
+    header{padding:16px 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    header h1{margin:0;font-size:18px;font-weight:800;letter-spacing:.2px;display:flex;align-items:center;gap:8px}
+    main{max-width:1100px;margin:0 auto;padding:10px}
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px;margin:12px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    input,button,textarea,select{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:#0f172a;color:var(--ink)}
+    button.primary{background:var(--accent);border-color:#38bdf8;color:#041e2a;font-weight:700}
+    button.good{background:var(--good);border-color:#34d399;color:#031a12;font-weight:700}
+    button.ghost{background:transparent;border-color:rgba(255,255,255,.25)}
+    .muted{color:var(--muted)}
+    .dim{color:var(--ink-dim)}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:8px;border-bottom:1px dashed rgba(255,255,255,.12);text-align:left}
+    tr.low td{opacity:.65}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    #log{white-space:pre-wrap;background:#0f172a;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px;margin-top:8px;max-height:220px;overflow:auto}
+    .pill{display:inline-block;border:1px solid rgba(255,255,255,.15);padding:2px 8px;border-radius:999px;font-size:12px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid rgba(255,255,255,.15)}
+    .grid2{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+    @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+    /* categories */
+    .cat-Gambling{background:#3b1d1d}
+    .cat-Adult{background:#3b1d2f}
+    .cat-Fines{background:#2f2b1d}
+    .cat-Online-subscription{background:#1d2f3b}
+    .cat-Financial-Other{background:#1d2f2b}
+    .cat-Other{background:#1f2438}
+    /* anomaly outlines */
+    .type-SENSITIVE{outline:1px solid var(--bad)}
+    .type-BURST{outline:1px solid var(--warn)}
+    .type-HIGH_ONE_OFF{outline:1px solid var(--good)}
+    .type-UNCLEAR_DESCRIPTOR{outline:1px dashed #8b5cf6}
+    .type-UNCOMMON{outline:1px dashed #38bdf8}
+    .type-MICRO_SPLIT{outline:1px dashed #f97316}
+    .type-SUBSCRIPTION_SINGLE{outline:1px dashed #14b8a6}
+    /* savings banner */
+    #saveBanner{display:none;background:#05212b;border:1px solid #065975;color:#a7f3d0;padding:10px;border-radius:10px;font-weight:700}
+    /* modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px}
+    .modal>div{background:#0f172a;border:1px solid rgba(255,255,255,.15);max-width:700px;width:100%;padding:18px;border-radius:12px}
+    .modal h3{margin:0 0 8px 0}
+    .modal-open{display:flex}
+    /* logo */
+    .logo{width:22px;height:22px;vertical-align:-4px}
+  </style>
+</head>
+<body>
+  <div id="envWarn" style="display:none;background:#7f1d1d;color:#fff;padding:8px;text-align:center">
+    Open via a local server (http://localhost) or HTTPS. Service Workers & PDF.js won’t work from the file system.
+  </div>
+  <script>(function(){ if(location.protocol==='file:'){ document.getElementById('envWarn').style.display='block'; } })();</script>
+
+  <header>
+    <h1>
+      <!-- tiny inline “piggy” logo -->
+      <svg class="logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M19 11c0-3.866-3.582-7-8-7-3.3 0-6.108 1.92-7.326 4.6C2.69 8.84 2 9.66 2 10.6v2.3C2 14.56 3.44 16 5.1 16H6v2c0 .55.45 1 1 1h1.4c.37 0 .7-.2.88-.52l.54-.98h3.57l.54.98c.18.32.52.52.89.52H17c.55 0 1-.45 1-1v-2h.2c1.49 0 2.8-.86 3.42-2.2.23-.5-.14-1.06-.69-1.06H20c-.55 0-1-.45-1-1Z" fill="#34d399"/>
+        <circle cx="9.2" cy="9.6" r="0.9" fill="#0f172a"/>
+        <path d="M12.2 8.8h1.6M12.2 10.8h1.6" stroke="#0f172a" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      Subscriptions Finder – Offline
+    </h1>
+    <span class="pill">No bank login</span>
+    <span class="pill">No cloud</span>
+    <span class="pill">Works offline</span>
+    <button id="btnPrivacy" class="ghost">Learn more</button>
+  </header>
+
+  <main>
+    <!-- Savings banner -->
+    <section id="saveBanner" class="card"></section>
+
+    <!-- Controls -->
+    <section class="card">
+      <div class="row">
+        <input id="fileInput" type="file" accept=".csv,.tsv,.txt,.pdf,.ofx,.qfx,.qif" multiple />
+        <button id="btnScan" class="primary">Scan</button>
+        <button id="btnDemo">Demo</button>
+        <button id="btnExportCSV">Export CSV</button>
+        <button id="btnExportHTML">Export HTML</button>
+        <button id="btnExportICS" class="good">Export .ics</button>
+      </div>
+      <div class="muted" style="margin-top:6px">Tip: CSV yields best accuracy. PDF must contain text (scanned images need OCR).</div>
+      <div id="log" class="muted"></div>
+    </section>
+
+    <section class="card grid2">
+      <div>
+        <strong>Recurring merchants</strong> <span id="resSummary" class="muted"></span>
+        <table id="tbl"><thead></thead><tbody></tbody></table>
+      </div>
+      <div>
+        <strong>Monthly cost summary</strong>
+        <table id="tblSum"><thead></thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <section class="card">
+      <strong>Weird payments (non-recurring)</strong>
+      <div class="row" style="margin:8px 0">
+        <label>High-amount ≥ $ <input type="number" id="inpHighAmt" value="50" min="0" step="1" style="width:90px"></label>
+        <label>Burst window <input type="number" id="inpBurstHours" value="36" min="6" step="6" style="width:70px"> h</label>
+        <button id="btnReapply">Recompute</button>
+      </div>
+      <table id="tblAnom"><thead></thead><tbody></tbody></table>
+    </section>
+
+    <section class="card">
+      <strong>Weird spend summary</strong>
+      <table id="tblWeirdSum"><thead></thead><tbody></tbody></table>
+    </section>
+
+    <section class="card">
+      <strong>Cancel-assist (offline)</strong>
+      <div class="row" style="margin:8px 0">
+        <input id="caMerchant" placeholder="Merchant" style="min-width:220px">
+        <input id="caAmount" type="number" step="0.01" placeholder="Amount" style="width:120px">
+        <input id="caDate" type="date" style="width:160px">
+        <button id="btnMail" class="primary">Open email draft</button>
+        <select id="caSupport" title="Quick support links">
+          <option value="">Support page…</option>
+          <option value="https://support.openai.com/">OpenAI</option>
+          <option value="https://support.spotify.com/">Spotify</option>
+          <option value="https://support.apple.com/billing">Apple Billing</option>
+          <option value="https://rapidapi.com/contact/">RapidAPI</option>
+          <option value="https://help.uber.com/">Uber</option>
+        </select>
+        <button id="btnFollowUp" class="good">Add reminder (.ics)</button>
+      </div>
+      <div class="dim">Tip: Click any row in “Weird payments” to prefill this form.</div>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>How it works</summary>
+        <p class="muted">
+          Parses statements on-device (CSV/PDF/OFX/QFX/QIF/TXT), normalizes merchant names, groups charges,
+          detects recurrence (weekly/biweekly/monthly/quarterly/yearly), predicts next charge, and estimates monthly cost.
+          Credits/refunds are ignored.
+        </p>
+      </details>
+    </section>
+  </main>
+
+  <footer style="text-align:center;padding:12px;font-size:13px;opacity:.7">
+    Privacy-first · No telemetry · Offline after first load (PDF.js cached)
+  </footer>
+
+  <!-- Privacy modal -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h3 id="modalTitle">Privacy & Security</h3>
+        <button id="modalClose" class="ghost">Close</button>
+      </div>
+      <ul>
+        <li><b>No bank login</b> – you only upload files you already have (CSV/PDF/OFX/QFX/QIF/TXT).</li>
+        <li><b>No cloud</b> – parsing & analysis happen <b>entirely in your browser</b>.</li>
+        <li><b>Offline after first load</b> – the Service Worker caches the app and PDF.js.</li>
+        <li><b>Export locally</b> – CSV/HTML/ICS files are created on-device.</li>
+      </ul>
+    </div>
+  </div>
+
+<script>
+/* ---------------------- Utilities ---------------------- */
+function log(msg){ const el=document.getElementById('log'); if(!el) return; el.textContent += (el.textContent?'\n':'') + msg; }
+function esc(s){ return String(s||'').replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function fmtDate(d){ return d? new Date(d).toISOString().slice(0,10):''; }
+function round(n){ return Math.round(n*100)/100; }
+function daysBetween(a,b){ return Math.max(1, Math.round((b-a)/86400000)); }
+function monthsCovered(rows){
+  if(!rows.length) return 1;
+  const ds=rows.map(r=>r.date).sort((a,b)=>a-b);
+  const days=daysBetween(ds[0], ds[ds.length-1]);
+  return Math.max(1, Math.round(days/30));
+}
+
+/* ---------------------- CSV / Text ---------------------- */
+function detectDelimiter(line){
+  const c={",":(line.match(/,/g)||[]).length,";":(line.match(/;/g)||[]).length,"\t":(line.match(/\t/g)||[]).length};
+  return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0]||",";
+}
+function parseCSV(text){
+  const lines=text.replace(/\r\n?/g,'\n').split('\n').filter(Boolean);
+  if(!lines.length) return {headers:[],rows:[]};
+  const delim=detectDelimiter(lines[0]);
+  const parseLine=(s)=>{let out=[],cur='',q=false;for(let i=0;i<s.length;i++){const ch=s[i];const nx=s[i+1];
+    if(ch==='"'){ if(q&&nx==='"'){cur+='"';i++;} else { q=!q; } }
+    else if(ch===delim && !q){ out.push(cur); cur=''; }
+    else { cur+=ch; }
+  } out.push(cur); return out;};
+  const headers=parseLine(lines[0]).map(h=>h.trim());
+  const rows=lines.slice(1).map(l=>parseLine(l).reduce((o,v,i)=>{o[headers[i]||('col'+i)]=(v||'').trim();return o;},{}));
+  return {headers,rows};
+}
+
+/* ---------------------- OFX/QFX ---------------------- */
+function parseOFXQFX(text){
+  const rows=[]; const items=text.split(/<STMTTRN>/i).slice(1).map(x=>x.split(/<\/STMTTRN>/i)[0]);
+  for(const it of items){
+    const get=(tag)=>{ const m=it.match(new RegExp(`<${tag}>([\\s\\S]*?)\\n`,'i')); return m? m[1].trim():''; };
+    const dt=get('DTPOSTED')||get('DTUSER'); const amt=get('TRNAMT'); const name=get('NAME')||get('MEMO')||'';
+    let d=null; if(dt && dt.length>=8){ const y=dt.slice(0,4), m=dt.slice(4,6), da=dt.slice(6,8); d = new Date(`${y}-${m}-${da}`); }
+    const a = parseAmountStr(amt);
+    if(d && a!==null) rows.push({date:d, amount:Math.abs(a), desc:name});
+  }
+  return rows;
+}
+
+/* ---------------------- QIF ---------------------- */
+function parseQIF(text){
+  const rows=[]; let d=null,t=null,p='';
+  for(const line of text.split(/\r?\n/)){
+    const c=line[0]; const v=(line.slice(1)||'').trim();
+    if(c==='D'){ d = tryParseDate(v); }
+    else if(c==='T'){ t = parseAmountStr(v); }
+    else if(c==='P'){ p = v; }
+    else if(c==='^'){ if(d && t!==null) rows.push({date:d, amount:Math.abs(t), desc:p}); d=null; t=null; p=''; }
+  }
+  return rows;
+}
+
+/* ---------------------- PDF ---------------------- */
+async function parsePDF(file){
+  if(!window['pdfjsLib']){ log('PDF.js not loaded yet. Connect once to cache it.'); return [];
+  }
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let text='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    text+=content.items.map(it=>it.str).join('\n')+'\n';
+  }
+  return parseBankStatementText(text);
+}
+
+// Robust-ish PDF/text statement parsing
+function parseBankStatementText(text){
+  const rawLines = text.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const yearGuess = (text.match(/\b20\d{2}\b/g)||[]).map(Number).filter(y=>y>=2020).sort((a,b)=>b-a)[0] || new Date().getFullYear();
+  const rows = [];
+  const skipMeta = (l) => /TOTAL|CREDIT LIMIT|VEUILLEZ|PLEASE|PAGE \d+|SUBTOTAL|SOUS-TOTAL/i.test(l);
+  const amtTail = /(?:CAD|USD|CA\$|US\$)?\s*([-+]?\$?\s*\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d{2}))\s*(?:CAD|USD|CA\$|US\$)?\s*$/i;
+  for (let i=0; i<rawLines.length; i++){
+    let l = rawLines[i]; if (skipMeta(l)) continue;
+    let joined = l, j = i;
+    while (!amtTail.test(joined) && j+1 < rawLines.length && rawLines[j+1].length < 60){ joined += ' ' + rawLines[++j]; }
+    if (j > i) i = j;
+    const mDate = joined.match(/(\d{4}-\d{2}-\d{2}|\d{2}[\/.-]\d{2}[\/.-]\d{4})/);
+    const mHead = joined.match(/^(\d{2})\s(\d{2})\b/);
+    const mAmt  = joined.match(amtTail);
+    if (!(mAmt && (mDate || mHead))) continue;
+
+    let d = null; if (mDate) d = new Date(mDate[0]); else d = new Date(`${yearGuess}-${mHead[1]}-${mHead[2]}`);
+    if (!d || isNaN(d)) continue;
+
+    const amt = parseFloat(mAmt[1].replace(/[^0-9.,-]/g,'').replace(/,/g,'.'));
+    if (!isFinite(amt)) continue;
+
+    let desc = joined;
+    if (mDate) desc = desc.replace(mDate[0],'');
+    if (mHead) desc = desc.replace(mHead[0],'');
+    desc = desc.replace(mAmt[0],'').replace(/\s{2,}/g,' ').trim();
+
+    // ignore clear credits/refunds
+    if (/PAYMENT RECEIVED|CREDIT|REFUND|REMBOURSEMENT/i.test(desc)) continue;
+
+    rows.push({ date: d, amount: Math.abs(amt), desc });
+  }
+  return rows;
+}
+
+/* ---------------------- Helpers & normalization ---------------------- */
+function parseAmountStr(s){
+  if(s==null) return null; let x=(''+s).trim();
+  let neg = (/\(|-/.test(x) && !/CR/i.test(x)) || /DR/i.test(x);
+  x = x.replace(/[^0-9,\.]/g,'');
+  const lastDot = x.lastIndexOf('.'); const lastComma = x.lastIndexOf(',');
+  let dec='.'; if(lastComma>lastDot) dec=','; if(dec===','){ x=x.replace(/\./g,'').replace(',', '.'); } else { x=x.replace(/,/g,''); }
+  const n=parseFloat(x); if(!isFinite(n)) return null; return neg? -Math.abs(n): n;
+}
+function tryParseDate(s){ const d=new Date(s); return isNaN(d)? null: d; }
+function normalizeDesc(desc){
+  let s=(desc||'').toLowerCase();
+  s=s.replace(/\d{4,}/g,' ');
+  s=s.replace(/[^\w\s]/g,' ');
+  s=s.replace(/\b(pos|debit|visa|purchase|auth|etransfer|e\-transfer|online|card|payment)\b/g,' ');
+  s=s.replace(/\s+/g,' ').trim();
+  return s || (desc||'').toLowerCase();
+}
+function catClass(name){ return 'cat-'+String(name||'Other').replace(/\s+/g,'-'); }
+
+/* ---------------------- Categorization ---------------------- */
+const RULES=[
+  {re:/(pokerstars|\bstars\b|onchan|xbiex|douglas)/i, cat:'Gambling', risk:3},
+  {re:/(epoch\.com|onlyfans|adult)/i, cat:'Adult', risk:3},
+  {re:/(justice\s+qu[eé]bec|cour\s+municipale)/i, cat:'Fines', risk:2},
+  {re:/(openai|chatgpt|runway|rapidapi|hostinger|godaddy|proton|x\s*corp|canva|spotify|apple\.com\/bill|loom)/i, cat:'Online subscription', risk:1},
+  {re:/(nayax|wifi\s*on\s*board|blueberry\s+markets|pykaso|dodo\s*pay|chevron)/i, cat:'Financial-Other', risk:1}
+];
+function categorize(desc){
+  for(const r of RULES){ if(r.re.test(desc||'')) return {category:r.cat,risk:r.risk}; }
+  return {category:'Other',risk:0};
+}
+
+/* ---------------------- Recurrence detection ---------------------- */
+const WINDOWS={WEEKLY:[6,8],BIWEEKLY:[13,15],MONTHLY:[28,31],QUARTERLY:[85,95],YEARLY:[364,366]};
+function analyze(rows){
+  if(!rows.length) return [];
+  const purchases = rows.filter(r=>r.date && isFinite(r.amount) && r.amount>0);
+  const groups=new Map();
+  for(const r of purchases){ const k=normalizeDesc(r.desc); if(!k) continue; (groups.get(k)||groups.set(k,[]).get(k)).push(r); }
+  const out=[];
+  for(const [merchant,list] of groups){
+    if(list.length<2) continue;
+    list.sort((a,b)=>a.date-b.date);
+    const dates=list.map(x=>x.date);
+    const amts=list.map(x=>Math.abs(x.amount));
+    const gaps=[]; for(let i=1;i<dates.length;i++) gaps.push((dates[i]-dates[i-1])/(86400000));
+    if(!gaps.length) continue;
+    const med = gaps.slice().sort((a,b)=>a-b)[Math.floor(gaps.length/2)];
+    let freq='UNKNOWN'; for(const [k,[lo,hi]] of Object.entries(WINDOWS)){ if(med>=lo && med<=hi){ freq=k; break; } }
+    // allow "IN_MONTH" when multiple in same month but not periodic
+    const monthCounts = {}; for(const t of list){ const ym = `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}`; monthCounts[ym] = (monthCounts[ym]||0)+1; }
+    const maxInMonth = Math.max(...Object.values(monthCounts));
+    if(maxInMonth>=3 && freq==='UNKNOWN') freq='IN_MONTH';
+
+    const variance = gaps.reduce((s,g)=>s+Math.pow(g-med,2),0)/gaps.length;
+    const spread = Math.max(...amts)-Math.min(...amts);
+    const cat=categorize(merchant);
+    let conf = 40 + Math.max(0,(list.length-2))*12 + Math.round(20*(1/(1+variance/50))) + Math.max(0,18 - spread*2) + (freq==='MONTHLY'?8:0) + (freq==='IN_MONTH'?6:0) + cat.risk*6;
+    conf = Math.max(0, Math.min(100, conf));
+    const last = dates[dates.length-1];
+    const next = (freq!=='UNKNOWN') ? new Date(last.getTime() + Math.round(med)*86400000) : null;
+    out.push({merchant, category:cat.category, count:list.length, freq, avg:round(amts.reduce((a,b)=>a+b,0)/amts.length), first:dates[0], last, next, confidence:conf});
+  }
+  out.sort((a,b)=> b.confidence - a.confidence || b.count - a.count || b.avg - a.avg );
+  return out;
+}
+function monthlyEquivalent(row){
+  switch(row.freq){
+    case 'WEEKLY': return row.avg*4.33;
+    case 'BIWEEKLY': return row.avg*2.165;
+    case 'QUARTERLY': return row.avg/3;
+    case 'YEARLY': return row.avg/12;
+    case 'MONTHLY': return row.avg;
+    default: return 0;
+  }
+}
+function makeSummary(rows){
+  const items = rows.map(r=>({merchant:r.merchant, category:r.category, monthly:round(monthlyEquivalent(r)), avg:r.avg, freq:r.freq}))
+                    .filter(x=>x.monthly>0);
+  items.sort((a,b)=>b.monthly-a.monthly);
+  const total = round(items.reduce((s,x)=>s+x.monthly,0));
+  return {items, total};
+}
+
+/* ---------------------- Weird payments (enhanced) ---------------------- */
+function isWeirdDescriptor(s){
+  const d=(s||'').toLowerCase();
+  const digitRatio=(d.match(/\d/g)||[]).length/Math.max(1,d.length);
+  if(digitRatio>0.30) return true;
+  if(/\b(pp\*|paypal\*|stripe|sq\*|shopify|order|ref[:#]?\d+)/.test(d)) return true;
+  if(/^[a-z0-9]{8,}$/.test(d) && !/\s/.test(d)) return true;
+  return false;
+}
+function findAnomalies(allRows, opts){
+  const rows = (allRows||[]).filter(r=>r && r.date && isFinite(r.amount) && r.amount>0);
+  const { highAmt=50, burstHours=36 } = (opts||{});
+  const windowMs = burstHours*3600*1000;
+
+  // Count per merchant
+  const byMerchant = new Map();
+  for(const r of rows){ const k=normalizeDesc(r.desc); if(!k) continue; (byMerchant.get(k)||byMerchant.set(k,[]).get(k)).push(r); }
+
+  // For "uncommon" baseline we’ll consider merchants with <=2 hits and not obvious staples
+  const commonHints=/\b(grocery|super\s*market|petrol|gas|fuel|uber|uber\s*eats|amazon|walmart|costco|metro|iga|provigo|canadian\s*tire|shell|esso|chevron)\b/i;
+
+  const out=[];
+  for(const [merchant,list] of byMerchant){
+    list.sort((a,b)=>a.date-b.date);
+    const catInfo = categorize(merchant);
+
+    // 1) Sensitive categories → flag all
+    if(catInfo.risk>=2){
+      for(const r of list){
+        out.push({date:r.date, merchant, category:catInfo.category, amount:round(Math.abs(r.amount)), type:'SENSITIVE', reason:`Sensitive category: ${catInfo.category}`});
+      }
+    }
+
+    // 2) Burst duplicate charges within time window
+    for(let i=1;i<list.length;i++){
+      const a=list[i-1], b=list[i];
+      if((b.date - a.date) <= windowMs){
+        const amtClose = Math.abs(b.amount - a.amount) <= Math.max(1, 0.05 * Math.max(b.amount, a.amount));
+        if(amtClose){
+          out.push({date:b.date, merchant, category:catInfo.category, amount:round(Math.abs(b.amount)), type:'BURST', reason:`Multiple charges within ${Math.round(windowMs/3600000)}h`});
+        }
+      }
+    }
+
+    // 3) Micro-splits: ≥3 charges under $5 within 7 days
+    const tiny = list.filter(r=>r.amount<5);
+    if(tiny.length>=3){
+      const first=tiny[0].date, last=tiny[tiny.length-1].date;
+      if(daysBetween(first,last)<=7){
+        for(const r of tiny){
+          out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'MICRO_SPLIT', reason:'Many small charges in short time'});
+        }
+      }
+    }
+
+    // 4) High single + unclear descriptor
+    if(list.length===1){
+      const r=list[0];
+      if(r.amount>=highAmt){
+        out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'HIGH_ONE_OFF', reason:`Single large charge ≥ $${highAmt}`});
+      }
+      if(isWeirdDescriptor(merchant)){
+        out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'UNCLEAR_DESCRIPTOR', reason:'Descriptor looks non-retail (codes/digits)'});
+      }
+      // 5) Subscription-like brand but only once
+      if(catInfo.category==='Online subscription'){
+        out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'SUBSCRIPTION_SINGLE', reason:'Subscription-like merchant but not recurring'});
+      }
+      // 6) Uncommon (rare merchant not matching common staples) ≥ $15
+      if(!commonHints.test(merchant) && r.amount>=15){
+        out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'UNCOMMON', reason:'Rare merchant in your data'});
+      }
+    } else if(list.length<=2 && !commonHints.test(merchant)) {
+      // two occurrences can also be uncommon (flag most recent)
+      const r=list[list.length-1];
+      if(r.amount>=15){
+        out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'UNCOMMON', reason:'Rare merchant in your data'});
+      }
+    }
+  }
+
+  // De-duplicate
+  const seen=new Set(); const uniq=[];
+  for(const r of out.sort((a,b)=> b.amount-a.amount || a.date-b.date)){
+    const key = [fmtDate(r.date), r.merchant, r.type].join('|');
+    if(!seen.has(key)){ seen.add(key); uniq.push(r); }
+  }
+  return uniq.slice(0,200);
+}
+
+/* ---------------------- Savings computation ---------------------- */
+function computeSavings(recurringRows, anomalies, allRows){
+  const months = monthsCovered(allRows);
+
+  // Recurring “cancel/pause” potential
+  const recMonthly = recurringRows.reduce((s,r)=> s + monthlyEquivalent(r), 0);
+
+  // Weird categories monthlyized from total in period
+  const sumByType = anomalies.reduce((m,a)=>{ m[a.type]=(m[a.type]||0)+a.amount; return m; }, {});
+  const sensMonthly = (sumByType['SENSITIVE']||0)/months;
+  const uncommonMonthly = (sumByType['UNCOMMON']||0)/months;
+  const microMonthly = (sumByType['MICRO_SPLIT']||0)/months;
+
+  const total = round(recMonthly + sensMonthly + uncommonMonthly + microMonthly);
+  return {
+    total,
+    months,
+    buckets:{
+      Recurring: round(recMonthly),
+      Sensitive: round(sensMonthly),
+      Uncommon: round(uncommonMonthly),
+      'Micro-splits': round(microMonthly),
+    }
+  };
+}
+
+/* ---------------------- Table helpers ---------------------- */
+function ensureTableSkeleton(el){ if(!el) return;
+  if(!el.querySelector('thead') || !el.querySelector('tbody')){ el.innerHTML = '<thead></thead><tbody></tbody>'; }
+}
+function setTable(el, theadHTML, tbodyHTML, emptyCols, emptyText){
+  if(!el){ log('Table element missing'); return; }
+  ensureTableSkeleton(el);
+  el.querySelector('thead').innerHTML = theadHTML || '';
+  el.querySelector('tbody').innerHTML = (tbodyHTML && tbodyHTML.trim()) ? tbodyHTML : `<tr><td colspan="${emptyCols}" class="muted">${emptyText}</td></tr>`;
+}
+
+/* ---------------------- Standardize CSV ---------------------- */
+function standardizeFromCSVRows(rows){
+  if(!rows.length) return [];
+  const lower = Object.keys(rows[0]).reduce((m,k)=> (m[k.toLowerCase()]=k, m), {});
+  const dateCol = Object.keys(lower).find(k=>k.includes('date'));
+  const descCol = Object.keys(lower).find(k=>k.includes('desc')||k.includes('merchant')||k.includes('details')||k.includes('libell'));
+  const amtCol  = Object.keys(lower).find(k=>k.includes('amount')||k==='amt'||k==='value'||k.includes('montant')||k.includes('debit')||k.includes('crédit')||k.includes('credit'));
+  const out=[];
+  for(const r of rows){
+    const d = tryParseDate(r[lower[dateCol]]);
+    const a = parseAmountStr(r[lower[amtCol]]);
+    const desc = r[lower[descCol]] || '';
+    if(d && a!==null) out.push({date:d, amount:Math.abs(a), desc});
+  }
+  return out;
+}
+
+/* ---------------------- UI glue ---------------------- */
+let lastFindings=[], lastAllRows=[], lastAnoms=[];
+
+document.addEventListener('DOMContentLoaded', () => {
+  const elIn=document.getElementById('fileInput');
+  const elBtn=document.getElementById('btnScan');
+  const elDemo=document.getElementById('btnDemo');
+  const elCSV=document.getElementById('btnExportCSV');
+  const elHTML=document.getElementById('btnExportHTML');
+  const elICS=document.getElementById('btnExportICS');
+  const elInpHighAmt=document.getElementById('inpHighAmt');
+  const elInpBurstHours=document.getElementById('inpBurstHours');
+  const elBtnReapply=document.getElementById('btnReapply');
+  const elAnom=document.getElementById('tblAnom');
+  const elWeirdSum=document.getElementById('tblWeirdSum');
+  const elSaveBanner=document.getElementById('saveBanner');
+
+  // Privacy modal
+  const modal=document.getElementById('modal');
+  document.getElementById('btnPrivacy').onclick=()=>modal.classList.add('modal-open');
+  document.getElementById('modalClose').onclick=()=>modal.classList.remove('modal-open');
+  modal.addEventListener('click',e=>{ if(e.target===modal) modal.classList.remove('modal-open'); });
+
+  // Cancel-assist
+  const caM=document.getElementById('caMerchant');
+  const caA=document.getElementById('caAmount');
+  const caD=document.getElementById('caDate');
+  document.getElementById('btnMail').onclick=()=>{
+    const merch=(caM.value||'').trim();
+    const amt=caA.value? Number(caA.value).toFixed(2):'';
+    const d=caD.value||'';
+    const subject=encodeURIComponent(`Cancellation / charge inquiry – ${merch}`);
+    const body=encodeURIComponent(
+`Hello,
+
+I'd like to cancel and/or clarify charges for: ${merch}.
+Last charge: ${d || '(date)'} for $${amt || '(amount)'}.
+
+Please confirm cancellation/closure and refund if applicable.
+Thank you.`);
+    location.href=`mailto:?subject=${subject}&body=${body}`;
+  };
+  document.getElementById('caSupport').onchange=(e)=>{ if(e.target.value){ window.open(e.target.value,'_blank'); e.target.value=''; } };
+  document.getElementById('btnFollowUp').onclick=()=>{
+    const merch=(caM.value||'').trim() || 'Subscription follow-up';
+    const inDays=7;
+    const dt=new Date(Date.now()+inDays*86400000);
+    const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,'0'), d=String(dt.getDate()).padStart(2,'0');
+    const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//subs_finder//EN','BEGIN:VEVENT',
+      'UID:'+merch.replace(/\s+/g,'_')+'@subs_finder',
+      'DTSTART;VALUE=DATE:'+`${y}${m}${d}`,
+      'SUMMARY:'+'Follow up: '+merch,
+      'END:VEVENT','END:VCALENDAR'];
+    download(lines.join('\n'), 'follow_up.ics', 'text/calendar');
+  };
+
+  // Click on anomaly row to prefill cancel-assist
+  elAnom.addEventListener('click', (e)=>{
+    const tr=e.target.closest('tr[data-merchant]');
+    if(!tr) return;
+    caM.value=tr.dataset.merchant||'';
+    caA.value=tr.dataset.amount||'';
+    caD.value=tr.dataset.date||'';
+  });
+
+  // Demo dataset
+  elDemo?.addEventListener('click',()=>{
+    const demo=`Date,Description,Amount
+2025-06-01,SPOTIFY AB,-14.59
+2025-07-01,SPOTIFY AB,-14.59
+2025-08-01,SPOTIFY AB,-14.59
+2025-06-15,OPENAI*CHATGPT SUBSCR,-23.00
+2025-07-15,OPENAI*CHATGPT SUBSCR,-23.00
+2025-08-15,OPENAI*CHATGPT SUBSCR,-23.00
+2025-07-20,UBER EATS,-23.44
+2025-07-14,STARS DOUGLAS MLT,-20.67
+2025-07-07,STARS DOUGLAS MLT,-40.00
+2025-06-16,RAPIDAPI NEW PROVIDENC NJ,-31.52
+2025-07-09,POKERSTARS TA XBIEX MLT,-20.00
+2025-07-04,CARDELIX CARTES BROSSARD QC,-2.49
+2025-07-08,CARDELIX CARTES BROSSARD QC,-3.12
+2025-07-16,CARDELIX CARTES BROSSARD QC,-1.99`;
+    const parsed=parseCSV(demo);
+    const std=standardizeFromCSVRows(parsed.rows);
+    lastAllRows = std;
+    render(std);
+    // Show savings banner for the demo
+    const findings=analyze(std);
+    const anoms=findAnomalies(std,{highAmt:50,burstHours:36});
+    const sav=computeSavings(findings, anoms, std);
+    elSaveBanner.style.display='block';
+    elSaveBanner.textContent = `This sample could free up $${sav.total}/month → Recurring $${sav.buckets.Recurring} · Sensitive $${sav.buckets.Sensitive} · Uncommon $${sav.buckets['Uncommon']} · Micro-splits $${sav.buckets['Micro-splits']}`;
+  });
+
+  // Scan button
+  elBtn?.addEventListener('click', async ()=>{
+    const files=Array.from(elIn.files||[]);
+    if(!files.length){ alert('Choose at least one file (.csv, .pdf, .ofx/.qfx, .qif, .txt)'); return; }
+    let all=[]; let counts={csv:0,pdf:0,ofx:0,qif:0,txt:0};
+    for(const f of files){
+      const name=f.name.toLowerCase();
+      try{
+        if(/\.csv$|\.tsv$|\.txt$/.test(name)){
+          const txt=await f.text(); const parsed=parseCSV(txt); all.push(...standardizeFromCSVRows(parsed.rows)); counts.csv++;
+        }else if(/\.ofx$|\.qfx$/.test(name)){ const txt=await f.text(); all.push(...parseOFXQFX(txt)); counts.ofx++;
+        }else if(/\.qif$/.test(name)){ const txt=await f.text(); all.push(...parseQIF(txt)); counts.qif++;
+        }else if(/\.pdf$/.test(name)){ const rows=await parsePDF(f); all.push(...rows); counts.pdf++;
+        }else{ const txt=await f.text(); all.push(...parseBankStatementText(txt)); counts.txt++; }
+      }catch(e){ log('Read error '+f.name+': '+(e.message||e)); }
+    }
+    log(`Files read → CSV:${counts.csv} PDF:${counts.pdf} OFX:${counts.ofx} QIF:${counts.qif} TXT:${counts.txt}`);
+    lastAllRows = all;
+    elSaveBanner.style.display='none';
+    render(all);
+  });
+
+  // Exports & tweaks
+  document.getElementById('btnExportCSV')?.addEventListener('click',()=> exportCSV(lastFindings));
+  document.getElementById('btnExportHTML')?.addEventListener('click',()=> exportHTML(lastFindings));
+  document.getElementById('btnExportICS')?.addEventListener('click',()=> exportICS(lastFindings));
+  elInpHighAmt?.addEventListener('input',()=> render(lastAllRows));
+  elInpBurstHours?.addEventListener('input',()=> render(lastAllRows));
+  elBtnReapply?.addEventListener('click',()=> render(lastAllRows));
+});
+
+function render(rows){
+  // Standardize
+  let allRows = rows || [];
+  if(allRows.length && !(allRows[0].date instanceof Date)) allRows = standardizeFromCSVRows(allRows);
+  lastAllRows = allRows;
+
+  // Recurring
+  const findings=analyze(allRows);
+  lastFindings = findings;
+  const elSum=document.getElementById('resSummary');
+  if(elSum) elSum.textContent = findings.length?`· ${findings.length} merchants`:'· None found';
+
+  const thead='<tr><th>Merchant</th><th>Category</th><th>Avg $</th><th>Freq</th><th>Repeats</th><th>First</th><th>Last</th><th>Next</th><th>Confidence</th><th>Monthly $</th></tr>';
+  const tbody=findings.map(r=>`<tr class="${r.confidence<60?'low':''}">
+    <td>${esc(r.merchant)}</td>
+    <td><span class="badge ${catClass(r.category)}">${r.category}</span></td>
+    <td>${r.avg}</td><td>${r.freq}</td><td>${r.count}</td>
+    <td>${fmtDate(r.first)}</td><td>${fmtDate(r.last)}</td><td>${fmtDate(r.next)}</td><td>${r.confidence}</td>
+    <td>${round(monthlyEquivalent(r))}</td></tr>`).join('');
+  setTable(document.getElementById('tbl'), thead, tbody, 10, 'Load a file and press Scan, or try Demo.');
+
+  // Monthly summary
+  const summary = makeSummary(findings);
+  const thead2='<tr><th>Merchant</th><th>Category</th><th>Monthly $</th><th>Freq</th></tr>';
+  const tbody2=summary.items.map(x=>`<tr><td>${esc(x.merchant)}</td><td><span class="badge ${catClass(x.category)}">${x.category}</span></td><td>${x.monthly}</td><td>${x.freq}</td></tr>`).join('') +
+               `<tr><td><b>Total</b></td><td></td><td><b>${summary.total}</b></td><td></td></tr>`;
+  setTable(document.getElementById('tblSum'), thead2, tbody2, 4, 'No monthly items');
+
+  // Weirds
+  const tHigh = (document.getElementById('inpHighAmt') && isFinite(parseFloat(document.getElementById('inpHighAmt').value))) ? Math.max(0, parseFloat(document.getElementById('inpHighAmt').value)) : 50;
+  const burst = document.getElementById('inpBurstHours')? Math.max(6, parseInt(document.getElementById('inpBurstHours').value)||36):36;
+  const anomalies = findAnomalies(allRows, {highAmt:tHigh, burstHours:burst});
+  lastAnoms = anomalies;
+  const theadA='<tr><th>Date</th><th>Merchant (normalized)</th><th>Category</th><th>Type</th><th>Amount $</th><th>Reason</th></tr>';
+  const tbodyA = anomalies.map(a=>`<tr class="type-${a.type}" data-merchant="${esc(a.merchant)}" data-amount="${a.amount}" data-date="${fmtDate(a.date)}">
+    <td>${fmtDate(a.date)}</td><td>${esc(a.merchant)}</td>
+    <td><span class="badge ${catClass(a.category)}">${a.category}</span></td>
+    <td>${a.type}</td><td>${a.amount}</td><td class="muted">${esc(a.reason)}</td></tr>`).join('');
+  setTable(document.getElementById('tblAnom'), theadA, tbodyA, 6, 'No weird payments detected');
+
+  // Weird spend summary (monthlyized across the time window)
+  const months = monthsCovered(allRows);
+  const byType = anomalies.reduce((m,a)=>{ m[a.type]=(m[a.type]||0)+a.amount; return m; }, {});
+  const total = round(Object.values(byType).reduce((s,x)=>s+x,0));
+  const topMerch = anomalies.reduce((m,a)=>{ m[a.merchant]=(m[a.merchant]||0)+a.amount; return m; }, {});
+  const top3 = Object.entries(topMerch).sort((a,b)=>b[1]-a[1]).slice(0,3)
+                 .map(([k,v])=>`${esc(k)} ($${round(v)})`).join(' · ') || '—';
+  const theadW='<tr><th>Total weird spend $</th><th>Breakdown by type</th><th>Top merchants</th></tr>';
+  const breakdown = Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}: $${round(v)}`).join(' · ') || '—';
+  const tbodyW=`<tr><td>${round(total)}</td><td>${breakdown}</td><td>${top3}</td></tr>
+                <tr><td colspan="3" class="dim">Period covers ~${months} month(s). Monthlyized weird spend ≈ $${round(total/months)}</td></tr>`;
+  setTable(document.getElementById('tblWeirdSum'), theadW, tbodyW, 3, '—');
+
+  // Savings banner (real data)
+  if(allRows.length){
+    const sav=computeSavings(findings, anomalies, allRows);
+    const elSaveBanner=document.getElementById('saveBanner');
+    elSaveBanner.style.display='block';
+    elSaveBanner.textContent = `You could free up ~$${sav.total}/month → Recurring $${sav.buckets.Recurring} · Sensitive $${sav.buckets.Sensitive} · Uncommon $${sav.buckets['Uncommon']} · Micro-splits $${sav.buckets['Micro-splits']}`;
+  }
+}
+
+/* ---------------------- Exports ---------------------- */
+function exportCSV(findings){
+  if(!findings || !findings.length){ alert('No data to export.'); return; }
+  const cols=['merchant','category','avg','freq','count','first','last','next','confidence','monthly'];
+  const lines=[cols.join(',')];
+  for(const r of findings){
+    const row=[
+      '"'+(r.merchant||'').replace(/"/g,'""')+'"',
+      '"'+(r.category||'')+'"',
+      r.avg, r.freq, r.count, fmtDate(r.first), fmtDate(r.last), fmtDate(r.next), r.confidence, round(monthlyEquivalent(r))
+    ];
+    lines.push(row.join(','));
+  }
+  download(lines.join('\n'),'report.csv','text/csv');
+}
+function exportHTML(findings){
+  if(!findings || !findings.length){ alert('No data to export.'); return; }
+  const rows=findings.map(r=>`<tr><td>${esc(r.merchant)}</td><td>${esc(r.category)}</td><td>${r.avg}</td><td>${r.freq}</td><td>${r.count}</td><td>${fmtDate(r.first)}</td><td>${fmtDate(r.last)}</td><td>${fmtDate(r.next)}</td><td>${r.confidence}</td><td>${round(monthlyEquivalent(r))}</td></tr>`).join('');
+  const html = `<!doctype html><meta charset='utf-8'><title>Subscriptions Report</title>
+  <style>body{font:14px Arial}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px}</style>
+  <h2>Suspected Subscriptions</h2>
+  <table><tr><th>Merchant</th><th>Category</th><th>Avg $</th><th>Freq</th><th>Repeats</th><th>First</th><th>Last</th><th>Next</th><th>Confidence</th><th>Monthly $</th></tr>${rows}</table>`;
+  download(html,'report.html','text/html');
+}
+function exportICS(findings){
+  if(!findings || !findings.length){ alert('No data to export.'); return; }
+  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//subs_finder_pwa//EN'];
+  for(const r of findings){
+    if(!r.next || r.confidence<60) continue;
+    const dt=fmtDate(r.next).replace(/-/g,'');
+    const summary = `Next charge: ${r.merchant} ($${r.avg})`;
+    const uid=(r.merchant||'').replace(/\s+/g,'_')+"@subs_pwa";
+    lines.push('BEGIN:VEVENT','UID:'+uid,'DTSTART;VALUE=DATE:'+dt,'SUMMARY:'+summary,'END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  download(lines.join('\n'),'subscriptions.ics','text/calendar');
+}
+function download(text,name,type){ const blob=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
+
+/* ---------------------- SW registration ---------------------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>

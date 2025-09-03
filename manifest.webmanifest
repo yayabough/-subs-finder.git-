@@ -1,0 +1,11 @@
+{
+  "name": "Subscriptions Finder (Offline)",
+  "short_name": "SubsFinder",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0f172a",
+  "description": "Find subscriptions & weird spend from statements. 100% offline.",
+  "icons": []
+}
