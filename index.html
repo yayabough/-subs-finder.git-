@@ -1,3 +1,8 @@
+<!-- ==========================
+FILE: index.html
+Subscriptions Finder – PWA (offline, no upload)
+Adds: Savings banner, smarter weird-payments, cancel-assist, trust modal, nicer UI, inline logo.
+========================== -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -47,12 +52,14 @@
     .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid rgba(255,255,255,.15)}
     .grid2{display:grid;grid-template-columns:2fr 1fr;gap:12px}
     @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+    /* categories */
     .cat-Gambling{background:#3b1d1d}
     .cat-Adult{background:#3b1d2f}
     .cat-Fines{background:#2f2b1d}
     .cat-Online-subscription{background:#1d2f3b}
     .cat-Financial-Other{background:#1d2f2b}
     .cat-Other{background:#1f2438}
+    /* anomaly outlines */
     .type-SENSITIVE{outline:1px solid var(--bad)}
     .type-BURST{outline:1px solid var(--warn)}
     .type-HIGH_ONE_OFF{outline:1px solid var(--good)}
@@ -60,11 +67,14 @@
     .type-UNCOMMON{outline:1px dashed #38bdf8}
     .type-MICRO_SPLIT{outline:1px dashed #f97316}
     .type-SUBSCRIPTION_SINGLE{outline:1px dashed #14b8a6}
+    /* savings banner */
     #saveBanner{display:none;background:#05212b;border:1px solid #065975;color:#a7f3d0;padding:10px;border-radius:10px;font-weight:700}
+    /* modal */
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px}
     .modal>div{background:#0f172a;border:1px solid rgba(255,255,255,.15);max-width:700px;width:100%;padding:18px;border-radius:12px}
     .modal h3{margin:0 0 8px 0}
     .modal-open{display:flex}
+    /* logo */
     .logo{width:22px;height:22px;vertical-align:-4px}
   </style>
 </head>
@@ -76,7 +86,7 @@
 
   <header>
     <h1>
-      <!-- tiny inline logo -->
+      <!-- tiny inline “piggy” logo -->
       <svg class="logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M19 11c0-3.866-3.582-7-8-7-3.3 0-6.108 1.92-7.326 4.6C2.69 8.84 2 9.66 2 10.6v2.3C2 14.56 3.44 16 5.1 16H6v2c0 .55.45 1 1 1h1.4c.37 0 .7-.2.88-.52l.54-.98h3.57l.54.98c.18.32.52.52.89.52H17c.55 0 1-.45 1-1v-2h.2c1.49 0 2.8-.86 3.42-2.2.23-.5-.14-1.06-.69-1.06H20c-.55 0-1-.45-1-1Z" fill="#34d399"/>
         <circle cx="9.2" cy="9.6" r="0.9" fill="#0f172a"/>
@@ -84,34 +94,34 @@
       </svg>
       Subscriptions Finder – Offline
     </h1>
+    <header style="display:flex;align-items:center;">
+  <h1>Subscriptions Finder – Offline</h1>
+
+  <!-- Buy button -->
+  <a href="https://yayabough.gumroad.com/l/subs-finder" target="_blank" rel="noopener"
+     style="margin-left:auto;text-decoration:none">
+    <span style="display:inline-block;padding:.4rem .7rem;border-radius:999px;border:1px solid #16a34a;background:#16a34a;color:#031a12;font-weight:600;">
+      Buy Pro – $9
+    </span>
+  </a>
+</header>
 
     <span class="pill">No bank login</span>
     <span class="pill">No cloud</span>
     <span class="pill">Works offline</span>
-
-    <a href="https://yayabough.gumroad.com/l/subs-finder" target="_blank" rel="noopener"
-       style="margin-left:auto;text-decoration:none">
-      <span class="badge" style="background:#16a34a;border-color:#16a34a;color:#031a12;font-weight:700;">
-        Buy Pro – $9
-      </span>
-    </a>
-
-    <button id="btnEnterCode" class="ghost">Enter code</button>
     <button id="btnPrivacy" class="ghost">Learn more</button>
   </header>
 
   <main>
-    <!-- Free/Pro banner -->
-    <section id="trialNote" class="card" style="display:none"></section>
-
     <!-- Savings banner -->
     <section id="saveBanner" class="card"></section>
 
     <!-- Controls -->
     <section class="card">
       <div class="row">
-        <input id="fileInput" type="file" accept=".csv,.tsv,.txt,.pdf,.ofx,.qfx,.qif" />
+        <input id="fileInput" type="file" accept=".csv,.tsv,.txt,.pdf,.ofx,.qfx,.qif" multiple />
         <button id="btnScan" class="primary">Scan</button>
+        <button id="btnDemo">Demo</button>
         <button id="btnExportCSV">Export CSV</button>
         <button id="btnExportHTML">Export HTML</button>
         <button id="btnExportICS" class="good">Export .ics</button>
@@ -142,6 +152,31 @@
     </section>
 
     <section class="card">
+      <strong>Weird spend summary</strong>
+      <table id="tblWeirdSum"><thead></thead><tbody></tbody></table>
+    </section>
+
+    <section class="card">
+      <strong>Cancel-assist (offline)</strong>
+      <div class="row" style="margin:8px 0">
+        <input id="caMerchant" placeholder="Merchant" style="min-width:220px">
+        <input id="caAmount" type="number" step="0.01" placeholder="Amount" style="width:120px">
+        <input id="caDate" type="date" style="width:160px">
+        <button id="btnMail" class="primary">Open email draft</button>
+        <select id="caSupport" title="Quick support links">
+          <option value="">Support page…</option>
+          <option value="https://support.openai.com/">OpenAI</option>
+          <option value="https://support.spotify.com/">Spotify</option>
+          <option value="https://support.apple.com/billing">Apple Billing</option>
+          <option value="https://rapidapi.com/contact/">RapidAPI</option>
+          <option value="https://help.uber.com/">Uber</option>
+        </select>
+        <button id="btnFollowUp" class="good">Add reminder (.ics)</button>
+      </div>
+      <div class="dim">Tip: Click any row in “Weird payments” to prefill this form.</div>
+    </section>
+
+    <section class="card">
       <details>
         <summary>How it works</summary>
         <p class="muted">
@@ -165,59 +200,15 @@
         <button id="modalClose" class="ghost">Close</button>
       </div>
       <ul>
-        <li><b>No bank login</b> – upload files you already have (CSV/PDF/OFX/QFX/QIF/TXT).</li>
-        <li><b>No cloud</b> – analysis happens <b>entirely in your browser</b>.</li>
-        <li><b>Offline after first load</b> – Service Worker caches the app and PDF.js.</li>
-        <li><b>Export locally</b> – CSV/HTML/ICS are created on-device.</li>
+        <li><b>No bank login</b> – you only upload files you already have (CSV/PDF/OFX/QFX/QIF/TXT).</li>
+        <li><b>No cloud</b> – parsing & analysis happen <b>entirely in your browser</b>.</li>
+        <li><b>Offline after first load</b> – the Service Worker caches the app and PDF.js.</li>
+        <li><b>Export locally</b> – CSV/HTML/ICS files are created on-device.</li>
       </ul>
-      <hr style="border-color:rgba(255,255,255,.1)">
-      <div class="muted">Free plan: <b>1 file per day</b>. Exports locked. Buy Pro to unlock everything.</div>
     </div>
   </div>
 
 <script>
-/* =================== Simple gating (Free = 1 file/day) =================== */
-const PRO_BUILD = false;                 // mets true dans le ZIP Pro si tu veux désactiver le gating
-const LS_PRO   = 'sf_pro';
-const LS_TRIAL = 'sf_trial_v2';          // v2 pour repartir sur une base propre
-const PRO = PRO_BUILD || (localStorage.getItem(LS_PRO) === '1');
-
-function getTrial(){
-  const def = { day: new Date().toISOString().slice(0,10), files: 0 };
-  try{
-    const obj = JSON.parse(localStorage.getItem(LS_TRIAL) || 'null') || def;
-    const today = new Date().toISOString().slice(0,10);
-    if(obj.day !== today) return { day: today, files: 0 };
-    return obj;
-  }catch{ return def; }
-}
-function setTrial(obj){ localStorage.setItem(LS_TRIAL, JSON.stringify(obj)); }
-
-function canScan(filesCount){
-  if (PRO) return {ok:true};
-  const t = getTrial();
-  if (filesCount === 0) return {ok:false, reason:'no_file'};
-  if (filesCount > 1)  return {ok:false, reason:'one_file_only'};
-  if (t.files >= 1)    return {ok:false, reason:'quota_reached'};
-  return {ok:true};
-}
-function bumpFileCount(){
-  const t = getTrial();
-  t.files = Math.min(1, (t.files||0) + 1);
-  setTrial(t);
-}
-function showTrialNote(){
-  const el = document.getElementById('trialNote');
-  if (!el) return;
-  if (PRO){ el.style.display='none'; return; }
-  const t = getTrial();
-  const left = Math.max(0, 1 - (t.files||0));
-  el.style.display='block';
-  el.innerHTML = `
-    <div><strong>Free mode:</strong> 1 file per day. Exports locked.</div>
-    <div class="muted" style="margin-top:6px">Remaining today: <b>${left}</b> file.</div>`;
-}
-
 /* ---------------------- Utilities ---------------------- */
 function log(msg){ const el=document.getElementById('log'); if(!el) return; el.textContent += (el.textContent?'\n':'') + msg; }
 function esc(s){ return String(s||'').replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
@@ -319,6 +310,7 @@ function parseBankStatementText(text){
     if (mHead) desc = desc.replace(mHead[0],'');
     desc = desc.replace(mAmt[0],'').replace(/\s{2,}/g,' ').trim();
 
+    // ignore clear credits/refunds
     if (/PAYMENT RECEIVED|CREDIT|REFUND|REMBOURSEMENT/i.test(desc)) continue;
 
     rows.push({ date: d, amount: Math.abs(amt), desc });
@@ -376,6 +368,7 @@ function analyze(rows){
     if(!gaps.length) continue;
     const med = gaps.slice().sort((a,b)=>a-b)[Math.floor(gaps.length/2)];
     let freq='UNKNOWN'; for(const [k,[lo,hi]] of Object.entries(WINDOWS)){ if(med>=lo && med<=hi){ freq=k; break; } }
+    // allow "IN_MONTH" when multiple in same month but not periodic
     const monthCounts = {}; for(const t of list){ const ym = `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}`; monthCounts[ym] = (monthCounts[ym]||0)+1; }
     const maxInMonth = Math.max(...Object.values(monthCounts));
     if(maxInMonth>=3 && freq==='UNKNOWN') freq='IN_MONTH';
@@ -424,9 +417,11 @@ function findAnomalies(allRows, opts){
   const { highAmt=50, burstHours=36 } = (opts||{});
   const windowMs = burstHours*3600*1000;
 
+  // Count per merchant
   const byMerchant = new Map();
   for(const r of rows){ const k=normalizeDesc(r.desc); if(!k) continue; (byMerchant.get(k)||byMerchant.set(k,[]).get(k)).push(r); }
 
+  // For "uncommon" baseline we’ll consider merchants with <=2 hits and not obvious staples
   const commonHints=/\b(grocery|super\s*market|petrol|gas|fuel|uber|uber\s*eats|amazon|walmart|costco|metro|iga|provigo|canadian\s*tire|shell|esso|chevron)\b/i;
 
   const out=[];
@@ -434,12 +429,14 @@ function findAnomalies(allRows, opts){
     list.sort((a,b)=>a.date-b.date);
     const catInfo = categorize(merchant);
 
+    // 1) Sensitive categories → flag all
     if(catInfo.risk>=2){
       for(const r of list){
         out.push({date:r.date, merchant, category:catInfo.category, amount:round(Math.abs(r.amount)), type:'SENSITIVE', reason:`Sensitive category: ${catInfo.category}`});
       }
     }
 
+    // 2) Burst duplicate charges within time window
     for(let i=1;i<list.length;i++){
       const a=list[i-1], b=list[i];
       if((b.date - a.date) <= windowMs){
@@ -450,6 +447,7 @@ function findAnomalies(allRows, opts){
       }
     }
 
+    // 3) Micro-splits: ≥3 charges under $5 within 7 days
     const tiny = list.filter(r=>r.amount<5);
     if(tiny.length>=3){
       const first=tiny[0].date, last=tiny[tiny.length-1].date;
@@ -460,6 +458,7 @@ function findAnomalies(allRows, opts){
       }
     }
 
+    // 4) High single + unclear descriptor
     if(list.length===1){
       const r=list[0];
       if(r.amount>=highAmt){
@@ -468,13 +467,16 @@ function findAnomalies(allRows, opts){
       if(isWeirdDescriptor(merchant)){
         out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'UNCLEAR_DESCRIPTOR', reason:'Descriptor looks non-retail (codes/digits)'});
       }
+      // 5) Subscription-like brand but only once
       if(catInfo.category==='Online subscription'){
         out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'SUBSCRIPTION_SINGLE', reason:'Subscription-like merchant but not recurring'});
       }
+      // 6) Uncommon (rare merchant not matching common staples) ≥ $15
       if(!commonHints.test(merchant) && r.amount>=15){
         out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'UNCOMMON', reason:'Rare merchant in your data'});
       }
     } else if(list.length<=2 && !commonHints.test(merchant)) {
+      // two occurrences can also be uncommon (flag most recent)
       const r=list[list.length-1];
       if(r.amount>=15){
         out.push({date:r.date, merchant, category:catInfo.category, amount:round(r.amount), type:'UNCOMMON', reason:'Rare merchant in your data'});
@@ -482,12 +484,50 @@ function findAnomalies(allRows, opts){
     }
   }
 
+  // De-duplicate
   const seen=new Set(); const uniq=[];
   for(const r of out.sort((a,b)=> b.amount-a.amount || a.date-b.date)){
     const key = [fmtDate(r.date), r.merchant, r.type].join('|');
     if(!seen.has(key)){ seen.add(key); uniq.push(r); }
   }
   return uniq.slice(0,200);
+}
+
+/* ---------------------- Savings computation ---------------------- */
+function computeSavings(recurringRows, anomalies, allRows){
+  const months = monthsCovered(allRows);
+
+  // Recurring “cancel/pause” potential
+  const recMonthly = recurringRows.reduce((s,r)=> s + monthlyEquivalent(r), 0);
+
+  // Weird categories monthlyized from total in period
+  const sumByType = anomalies.reduce((m,a)=>{ m[a.type]=(m[a.type]||0)+a.amount; return m; }, {});
+  const sensMonthly = (sumByType['SENSITIVE']||0)/months;
+  const uncommonMonthly = (sumByType['UNCOMMON']||0)/months;
+  const microMonthly = (sumByType['MICRO_SPLIT']||0)/months;
+
+  const total = round(recMonthly + sensMonthly + uncommonMonthly + microMonthly);
+  return {
+    total,
+    months,
+    buckets:{
+      Recurring: round(recMonthly),
+      Sensitive: round(sensMonthly),
+      Uncommon: round(uncommonMonthly),
+      'Micro-splits': round(microMonthly),
+    }
+  };
+}
+
+/* ---------------------- Table helpers ---------------------- */
+function ensureTableSkeleton(el){ if(!el) return;
+  if(!el.querySelector('thead') || !el.querySelector('tbody')){ el.innerHTML = '<thead></thead><tbody></tbody>'; }
+}
+function setTable(el, theadHTML, tbodyHTML, emptyCols, emptyText){
+  if(!el){ log('Table element missing'); return; }
+  ensureTableSkeleton(el);
+  el.querySelector('thead').innerHTML = theadHTML || '';
+  el.querySelector('tbody').innerHTML = (tbodyHTML && tbodyHTML.trim()) ? tbodyHTML : `<tr><td colspan="${emptyCols}" class="muted">${emptyText}</td></tr>`;
 }
 
 /* ---------------------- Standardize CSV ---------------------- */
@@ -513,15 +553,16 @@ let lastFindings=[], lastAllRows=[], lastAnoms=[];
 document.addEventListener('DOMContentLoaded', () => {
   const elIn=document.getElementById('fileInput');
   const elBtn=document.getElementById('btnScan');
+  const elDemo=document.getElementById('btnDemo');
   const elCSV=document.getElementById('btnExportCSV');
   const elHTML=document.getElementById('btnExportHTML');
   const elICS=document.getElementById('btnExportICS');
   const elInpHighAmt=document.getElementById('inpHighAmt');
   const elInpBurstHours=document.getElementById('inpBurstHours');
   const elBtnReapply=document.getElementById('btnReapply');
+  const elAnom=document.getElementById('tblAnom');
+  const elWeirdSum=document.getElementById('tblWeirdSum');
   const elSaveBanner=document.getElementById('saveBanner');
-
-  showTrialNote();
 
   // Privacy modal
   const modal=document.getElementById('modal');
@@ -529,30 +570,81 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modalClose').onclick=()=>modal.classList.remove('modal-open');
   modal.addEventListener('click',e=>{ if(e.target===modal) modal.classList.remove('modal-open'); });
 
-  // simple local “Enter code” (for your tests)
-  document.getElementById('btnEnterCode').onclick=()=>{
-    const code = prompt('Enter code (for test, use DEMO-123):','');
-    if(!code) return;
-    if(code === 'DEMO-123'){
-      localStorage.setItem(LS_PRO,'1');
-      alert('Pro unlocked in this browser. Reloading…');
-      location.reload();
-    }else{
-      alert('Invalid code.');
-    }
+  // Cancel-assist
+  const caM=document.getElementById('caMerchant');
+  const caA=document.getElementById('caAmount');
+  const caD=document.getElementById('caDate');
+  document.getElementById('btnMail').onclick=()=>{
+    const merch=(caM.value||'').trim();
+    const amt=caA.value? Number(caA.value).toFixed(2):'';
+    const d=caD.value||'';
+    const subject=encodeURIComponent(`Cancellation / charge inquiry – ${merch}`);
+    const body=encodeURIComponent(
+`Hello,
+
+I'd like to cancel and/or clarify charges for: ${merch}.
+Last charge: ${d || '(date)'} for $${amt || '(amount)'}.
+
+Please confirm cancellation/closure and refund if applicable.
+Thank you.`);
+    location.href=`mailto:?subject=${subject}&body=${body}`;
+  };
+  document.getElementById('caSupport').onchange=(e)=>{ if(e.target.value){ window.open(e.target.value,'_blank'); e.target.value=''; } };
+  document.getElementById('btnFollowUp').onclick=()=>{
+    const merch=(caM.value||'').trim() || 'Subscription follow-up';
+    const inDays=7;
+    const dt=new Date(Date.now()+inDays*86400000);
+    const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,'0'), d=String(dt.getDate()).padStart(2,'0');
+    const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//subs_finder//EN','BEGIN:VEVENT',
+      'UID:'+merch.replace(/\s+/g,'_')+'@subs_finder',
+      'DTSTART;VALUE=DATE:'+`${y}${m}${d}`,
+      'SUMMARY:'+'Follow up: '+merch,
+      'END:VEVENT','END:VCALENDAR'];
+    download(lines.join('\n'), 'follow_up.ics', 'text/calendar');
   };
 
-  // Scan with gating
+  // Click on anomaly row to prefill cancel-assist
+  elAnom.addEventListener('click', (e)=>{
+    const tr=e.target.closest('tr[data-merchant]');
+    if(!tr) return;
+    caM.value=tr.dataset.merchant||'';
+    caA.value=tr.dataset.amount||'';
+    caD.value=tr.dataset.date||'';
+  });
+
+  // Demo dataset
+  elDemo?.addEventListener('click',()=>{
+    const demo=`Date,Description,Amount
+2025-06-01,SPOTIFY AB,-14.59
+2025-07-01,SPOTIFY AB,-14.59
+2025-08-01,SPOTIFY AB,-14.59
+2025-06-15,OPENAI*CHATGPT SUBSCR,-23.00
+2025-07-15,OPENAI*CHATGPT SUBSCR,-23.00
+2025-08-15,OPENAI*CHATGPT SUBSCR,-23.00
+2025-07-20,UBER EATS,-23.44
+2025-07-14,STARS DOUGLAS MLT,-20.67
+2025-07-07,STARS DOUGLAS MLT,-40.00
+2025-06-16,RAPIDAPI NEW PROVIDENC NJ,-31.52
+2025-07-09,POKERSTARS TA XBIEX MLT,-20.00
+2025-07-04,CARDELIX CARTES BROSSARD QC,-2.49
+2025-07-08,CARDELIX CARTES BROSSARD QC,-3.12
+2025-07-16,CARDELIX CARTES BROSSARD QC,-1.99`;
+    const parsed=parseCSV(demo);
+    const std=standardizeFromCSVRows(parsed.rows);
+    lastAllRows = std;
+    render(std);
+    // Show savings banner for the demo
+    const findings=analyze(std);
+    const anoms=findAnomalies(std,{highAmt:50,burstHours:36});
+    const sav=computeSavings(findings, anoms, std);
+    elSaveBanner.style.display='block';
+    elSaveBanner.textContent = `This sample could free up $${sav.total}/month → Recurring $${sav.buckets.Recurring} · Sensitive $${sav.buckets.Sensitive} · Uncommon $${sav.buckets['Uncommon']} · Micro-splits $${sav.buckets['Micro-splits']}`;
+  });
+
+  // Scan button
   elBtn?.addEventListener('click', async ()=>{
     const files=Array.from(elIn.files||[]);
-    const gate = canScan(files.length);
-    if(!gate.ok){
-      if(gate.reason==='no_file')        alert('Choose one file (.csv, .pdf, .ofx/.qfx, .qif, .txt)');
-      else if(gate.reason==='one_file_only') alert('Free mode: exactly 1 file per day.');
-      else if(gate.reason==='quota_reached') alert('Free limit reached (1 file/day). Buy Pro to continue today.');
-      return;
-    }
-
+    if(!files.length){ alert('Choose at least one file (.csv, .pdf, .ofx/.qfx, .qif, .txt)'); return; }
     let all=[]; let counts={csv:0,pdf:0,ofx:0,qif:0,txt:0};
     for(const f of files){
       const name=f.name.toLowerCase();
@@ -565,36 +657,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }else{ const txt=await f.text(); all.push(...parseBankStatementText(txt)); counts.txt++; }
       }catch(e){ log('Read error '+f.name+': '+(e.message||e)); }
     }
-
-    // doux cap gratuit (ex: 150 lignes)
-    if(!PRO && all.length>150){
-      all = all.slice(0,150);
-      log('Free mode: only first 150 rows analyzed. Buy Pro for full analysis.');
-    }
-
     log(`Files read → CSV:${counts.csv} PDF:${counts.pdf} OFX:${counts.ofx} QIF:${counts.qif} TXT:${counts.txt}`);
     lastAllRows = all;
     elSaveBanner.style.display='none';
     render(all);
-
-    if(!PRO){ bumpFileCount(); showTrialNote(); }
   });
 
-  // Exports (Pro only)
-  elCSV?.addEventListener('click',()=> { if(!PRO){ alert('Exports are Pro-only.'); return; } exportCSV(lastFindings); });
-  elHTML?.addEventListener('click',()=> { if(!PRO){ alert('Exports are Pro-only.'); return; } exportHTML(lastFindings); });
-  elICS?.addEventListener('click',()=> { if(!PRO){ alert('Exports are Pro-only.'); return; } exportICS(lastFindings); });
-
+  // Exports & tweaks
+  document.getElementById('btnExportCSV')?.addEventListener('click',()=> exportCSV(lastFindings));
+  document.getElementById('btnExportHTML')?.addEventListener('click',()=> exportHTML(lastFindings));
+  document.getElementById('btnExportICS')?.addEventListener('click',()=> exportICS(lastFindings));
   elInpHighAmt?.addEventListener('input',()=> render(lastAllRows));
   elInpBurstHours?.addEventListener('input',()=> render(lastAllRows));
   elBtnReapply?.addEventListener('click',()=> render(lastAllRows));
 });
 
 function render(rows){
+  // Standardize
   let allRows = rows || [];
   if(allRows.length && !(allRows[0].date instanceof Date)) allRows = standardizeFromCSVRows(allRows);
   lastAllRows = allRows;
 
+  // Recurring
   const findings=analyze(allRows);
   lastFindings = findings;
   const elSum=document.getElementById('resSummary');
@@ -607,25 +691,41 @@ function render(rows){
     <td>${r.avg}</td><td>${r.freq}</td><td>${r.count}</td>
     <td>${fmtDate(r.first)}</td><td>${fmtDate(r.last)}</td><td>${fmtDate(r.next)}</td><td>${r.confidence}</td>
     <td>${round(monthlyEquivalent(r))}</td></tr>`).join('');
-  setTable(document.getElementById('tbl'), thead, tbody, 10, 'Load a file and press Scan.');
+  setTable(document.getElementById('tbl'), thead, tbody, 10, 'Load a file and press Scan, or try Demo.');
 
+  // Monthly summary
   const summary = makeSummary(findings);
   const thead2='<tr><th>Merchant</th><th>Category</th><th>Monthly $</th><th>Freq</th></tr>';
   const tbody2=summary.items.map(x=>`<tr><td>${esc(x.merchant)}</td><td><span class="badge ${catClass(x.category)}">${x.category}</span></td><td>${x.monthly}</td><td>${x.freq}</td></tr>`).join('') +
                `<tr><td><b>Total</b></td><td></td><td><b>${summary.total}</b></td><td></td></tr>`;
   setTable(document.getElementById('tblSum'), thead2, tbody2, 4, 'No monthly items');
 
+  // Weirds
   const tHigh = (document.getElementById('inpHighAmt') && isFinite(parseFloat(document.getElementById('inpHighAmt').value))) ? Math.max(0, parseFloat(document.getElementById('inpHighAmt').value)) : 50;
   const burst = document.getElementById('inpBurstHours')? Math.max(6, parseInt(document.getElementById('inpBurstHours').value)||36):36;
   const anomalies = findAnomalies(allRows, {highAmt:tHigh, burstHours:burst});
   lastAnoms = anomalies;
   const theadA='<tr><th>Date</th><th>Merchant (normalized)</th><th>Category</th><th>Type</th><th>Amount $</th><th>Reason</th></tr>';
-  const tbodyA = anomalies.map(a=>`<tr class="type-${a.type}">
+  const tbodyA = anomalies.map(a=>`<tr class="type-${a.type}" data-merchant="${esc(a.merchant)}" data-amount="${a.amount}" data-date="${fmtDate(a.date)}">
     <td>${fmtDate(a.date)}</td><td>${esc(a.merchant)}</td>
     <td><span class="badge ${catClass(a.category)}">${a.category}</span></td>
     <td>${a.type}</td><td>${a.amount}</td><td class="muted">${esc(a.reason)}</td></tr>`).join('');
   setTable(document.getElementById('tblAnom'), theadA, tbodyA, 6, 'No weird payments detected');
 
+  // Weird spend summary (monthlyized across the time window)
+  const months = monthsCovered(allRows);
+  const byType = anomalies.reduce((m,a)=>{ m[a.type]=(m[a.type]||0)+a.amount; return m; }, {});
+  const total = round(Object.values(byType).reduce((s,x)=>s+x,0));
+  const topMerch = anomalies.reduce((m,a)=>{ m[a.merchant]=(m[a.merchant]||0)+a.amount; return m; }, {});
+  const top3 = Object.entries(topMerch).sort((a,b)=>b[1]-a[1]).slice(0,3)
+                 .map(([k,v])=>`${esc(k)} ($${round(v)})`).join(' · ') || '—';
+  const theadW='<tr><th>Total weird spend $</th><th>Breakdown by type</th><th>Top merchants</th></tr>';
+  const breakdown = Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}: $${round(v)}`).join(' · ') || '—';
+  const tbodyW=`<tr><td>${round(total)}</td><td>${breakdown}</td><td>${top3}</td></tr>
+                <tr><td colspan="3" class="dim">Period covers ~${months} month(s). Monthlyized weird spend ≈ $${round(total/months)}</td></tr>`;
+  setTable(document.getElementById('tblWeirdSum'), theadW, tbodyW, 3, '—');
+
+  // Savings banner (real data)
   if(allRows.length){
     const sav=computeSavings(findings, anomalies, allRows);
     const elSaveBanner=document.getElementById('saveBanner');
