@@ -116,11 +116,15 @@
       <div class="row">
         <input id="fileInput" type="file" accept=".csv,.tsv,.txt,.pdf,.ofx,.qfx,.qif" />
         <button id="btnScan" class="primary">Scan</button>
+        <button id="btnDemo" class="ghost" title="Load example data (does not count toward free limit)">Demo</button>
         <button id="btnExportCSV">Export CSV</button>
         <button id="btnExportHTML">Export HTML</button>
         <button id="btnExportICS" class="good">Export .ics</button>
       </div>
-      <div class="muted" style="margin-top:6px">Tip: CSV yields best accuracy. PDF must contain text (not scanned images).</div>
+      <div class="muted" id="howLine" style="margin-top:6px">
+        How to: <b>Select file</b> → <b>Scan</b>. Or press <b>Demo</b> to see example results. Free = 1 file total; Pro = unlimited files + exports.
+      </div>
+      <div class="muted">Tip: CSV yields best accuracy. PDF must contain text (not scanned images).</div>
       <div id="log" class="muted"></div>
     </section>
 
@@ -189,6 +193,7 @@
       <ol style="line-height:1.6;margin:8px 0 0 18px">
         <li>Click <b>Select file</b>, choose a bank statement (<b>CSV</b> recommended; <b>PDF</b> must contain text; also supports OFX/QFX/QIF/TXT).</li>
         <li>Click <b>Scan</b>. We analyze on-device and show <b>Recurring</b> + <b>Weird payments</b>.</li>
+        <li>Or click <b>Demo</b> to load example results instantly (does not count toward your free limit).</li>
         <li><b>Free</b> lets you scan <u>one file only</u> (per browser). To scan more or combine multiple statements, <b>Buy Pro</b>.</li>
         <li><b>Pro</b> unlocks <u>unlimited files</u> (multi-upload) and <b>exports</b> (CSV/HTML/ICS).</li>
       </ol>
@@ -243,7 +248,7 @@ function showTrialNote(){
 
 /* ===== Utilities ===== */
 function log(msg){ const el=document.getElementById('log'); if(!el) return; el.textContent += (el.textContent?'\n':'') + msg; }
-function esc(s){ return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function esc(s){ return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt'}[c] || c)); }
 function fmtDate(d){ return d? new Date(d).toISOString().slice(0,10):''; }
 function round(n){ return Math.round(n*100)/100; }
 function daysBetween(a,b){ return Math.max(1, Math.round((b-a)/86400000)); }
@@ -551,12 +556,42 @@ function standardizeFromCSVRows(rows){
   return out;
 }
 
+/* ===== Demo data ===== */
+function demoData(){
+  // helper: days ago
+  const ago = (n)=>{ const d=new Date(); d.setDate(d.getDate()-n); return d; };
+  const rows = [
+    // Recurring examples (monthly-ish)
+    {date:ago(5),  amount:12.99, desc:'Spotify P1234 CANADA'},
+    {date:ago(35), amount:12.99, desc:'Spotify P5678 CANADA'},
+    {date:ago(65), amount:12.99, desc:'Spotify P9101 CANADA'},
+
+    {date:ago(7),  amount:9.99,  desc:'OpenAI ChatGPT Plus'},
+    {date:ago(37), amount:9.99,  desc:'OpenAI ChatGPT Plus'},
+    {date:ago(67), amount:9.99,  desc:'OpenAI ChatGPT Plus'},
+
+    {date:ago(10), amount:39.00, desc:'Gym-Membership CityFit'},
+    {date:ago(40), amount:39.00, desc:'Gym-Membership CityFit'},
+    {date:ago(70), amount:39.00, desc:'Gym-Membership CityFit'},
+
+    // Weird / anomalies
+    {date:ago(3),  amount:120.00, desc:'UBER   *TRIP 9F2XZ'},                 // high one-off
+    {date:ago(2),  amount:14.99,  desc:'PP* ORDER #A919203'},                 // unclear descriptor
+    {date:ago(2),  amount:14.99,  desc:'PP* ORDER #A919204'},                 // burst
+    {date:ago(2),  amount:3.00,   desc:'TinyCharge'},                         // micro-split set
+    {date:ago(2),  amount:2.50,   desc:'TinyCharge'},
+    {date:ago(1),  amount:2.00,   desc:'TinyCharge'}
+  ];
+  return rows;
+}
+
 /* ===== UI glue ===== */
 let lastFindings=[], lastAllRows=[], lastAnoms=[];
 
 document.addEventListener('DOMContentLoaded', () => {
   const elIn=document.getElementById('fileInput');
   const elBtn=document.getElementById('btnScan');
+  const elDemo=document.getElementById('btnDemo');
   const elCSV=document.getElementById('btnExportCSV');
   const elHTML=document.getElementById('btnExportHTML');
   const elICS=document.getElementById('btnExportICS');
@@ -590,6 +625,14 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Pro unlocked in this browser. Reloading…');
     location.reload();
   };
+
+  // Demo (does NOT affect free file quota)
+  elDemo?.addEventListener('click', ()=>{
+    const rows = demoData();
+    lastAllRows = rows;
+    render(rows);
+    log('Demo data loaded. This does not count toward your free limit.');
+  });
 
   // Scan
   elBtn?.addEventListener('click', async ()=>{
