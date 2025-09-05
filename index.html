@@ -100,7 +100,6 @@
       <span class="badge" style="background:#16a34a;border-color:#16a34a;color:#031a12;font-weight:700;">Buy Pro – $9</span>
     </a>
 
-    <button id="btnEnterCode" class="ghost" title="For testing without Gumroad">Enter code</button>
     <button id="btnPrivacy" class="ghost">Learn more</button>
 <div id="promo" style="background:#0ea5e9;color:#041e2a;padding:10px 14px;font-weight:800;display:flex;gap:12px;align-items:center;justify-content:center">
   <span>🎉 Launch promo: <b>FIRST100</b> → Pro for <b>$5</b> (100 copies, 24h)</span>
@@ -652,14 +651,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('howClose').onclick=()=>how.classList.remove('modal-open');
   how.addEventListener('click',e=>{ if(e.target===how) how.classList.remove('modal-open'); });
 
-  // Pro unlock (testing or via redirect param handled above)
-  document.getElementById('btnEnterCode').onclick=()=>{
-    const code = prompt('Enter code (test only):','');
-    if(!code) return;
-    localStorage.setItem(LS_PRO,'1');
-    alert('Pro unlocked in this browser. Reloading…');
-    location.reload();
-  };
 
   // Demo (does NOT affect free file quota)
   elDemo?.addEventListener('click', ()=>{
