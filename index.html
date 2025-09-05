@@ -590,15 +590,12 @@ function demoData(){
     {date:ago(5),  amount:12.99, desc:'Spotify P1234 CANADA'},
     {date:ago(35), amount:12.99, desc:'Spotify P5678 CANADA'},
     {date:ago(65), amount:12.99, desc:'Spotify P9101 CANADA'},
-
     {date:ago(7),  amount:9.99,  desc:'OpenAI ChatGPT Plus'},
     {date:ago(37), amount:9.99,  desc:'OpenAI ChatGPT Plus'},
     {date:ago(67), amount:9.99,  desc:'OpenAI ChatGPT Plus'},
-
     {date:ago(10), amount:39.00, desc:'Gym-Membership CityFit'},
     {date:ago(40), amount:39.00, desc:'Gym-Membership CityFit'},
     {date:ago(70), amount:39.00, desc:'Gym-Membership CityFit'},
-
     {date:ago(3),  amount:120.00, desc:'UBER   *TRIP 9F2XZ'},
     {date:ago(2),  amount:14.99,  desc:'PP* ORDER #A919203'},
     {date:ago(2),  amount:14.99,  desc:'PP* ORDER #A919204'},
@@ -805,9 +802,21 @@ function exportICS(findings){
 }
 function download(text,name,type){ const blob=new Blob([text],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
 
-/* ===== SW registration (optional) ===== */
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+/* ===== SW registration — ALWAYS UPDATE ===== */
+if ('serviceWorker' in navigator && !new URLSearchParams(location.search).has('nosw')) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+      reg.update(); // check now
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update();
+      });
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!reloading) { reloading = true; location.reload(); } // auto reload once when new SW takes control
+      });
+    } catch (e) { /* ignore */ }
+  });
 }
 </script>
 </body>

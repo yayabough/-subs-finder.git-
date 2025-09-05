@@ -1,30 +1,71 @@
-// sw.js — cache app + PDF.js for offline
-const CACHE = 'subs-finder-v5';
-const ASSETS = [
-  './', './index.html', './sw.js', './manifest.webmanifest',
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
+// sw.js
+// Change this string on every deploy (v2, v3, a date, anything new)
+const VERSION = 'v1';
+
+const STATIC_CACHE  = `static-${VERSION}`;
+const RUNTIME_CACHE = `runtime-${VERSION}`;
+
+const APP_SHELL = [
+  './',
+  './index.html',
+  './assets/favicon.svg',
+  './manifest.webmanifest'
 ];
 
-self.addEventListener('install', (e)=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(STATIC_CACHE);
+    await cache.addAll(APP_SHELL);
+    self.skipWaiting();          // activate immediately
+  })());
 });
-self.addEventListener('activate', (e)=>{
-  e.waitUntil(
-    caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))
-      .then(()=>self.clients.claim())
-  );
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => {
+      if (k !== STATIC_CACHE && k !== RUNTIME_CACHE) return caches.delete(k);
+    }));
+    await self.clients.claim();  // take control now
+  })());
 });
-self.addEventListener('fetch', (e)=>{
-  const url = new URL(e.request.url);
-  const isCDN = /cdn.jsdelivr.net/.test(url.hostname);
-  const isSame = url.origin===location.origin;
-  if(e.request.method==='GET' && (isSame || isCDN)){
-    e.respondWith(
-      caches.match(e.request).then(r=> r || fetch(e.request).then(res=>{
-        const copy=res.clone(); caches.open(CACHE).then(c=>c.put(e.request, copy));
-        return res;
-      }))
-    );
+
+// Network-first for HTML (so new UI shows as soon as you publish)
+// Cache-first for same-origin assets (fast), with background refresh
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const accept = req.headers.get('accept') || '';
+
+  // HTML pages
+  if (req.mode === 'navigate' || accept.includes('text/html')) {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req, { cache: 'no-store' });
+        const c = await caches.open(RUNTIME_CACHE);
+        c.put(req, fresh.clone());
+        return fresh;
+      } catch {
+        return (await caches.match(req)) || (await caches.match('./index.html'));
+      }
+    })());
+    return;
+  }
+
+  // Same-origin assets
+  const url = new URL(req.url);
+  if (url.origin === location.origin) {
+    event.respondWith((async () => {
+      const cached = await caches.match(req);
+      if (cached) {
+        // refresh in background
+        fetch(req).then(res => caches.open(RUNTIME_CACHE).then(c => c.put(req, res))).catch(()=>{});
+        return cached;
+      }
+      const res = await fetch(req);
+      const c = await caches.open(RUNTIME_CACHE);
+      c.put(req, res.clone());
+      return res;
+    })());
+    return;
   }
 });
