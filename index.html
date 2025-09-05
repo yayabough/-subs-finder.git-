@@ -246,9 +246,36 @@ function showTrialNote(){
     <div class="muted" style="margin-top:6px">Remaining: <b>${left}</b> file.</div>`;
 }
 
+/* ==== FREE LOCK (helpers) ==== */
+function isFreeLocked(){ return !PRO && (getTrial().files||0) >= 1; }
+function applyFreeLockUI(){
+  const input = document.getElementById('fileInput');
+  const scan  = document.getElementById('btnScan');
+  const note  = document.getElementById('trialNote');
+  if (!input || !scan) return;
+
+  if (isFreeLocked()){
+    input.value = '';
+    input.disabled = true;
+    scan.disabled  = true;
+
+    if (note){
+      note.style.display = 'block';
+      note.innerHTML = `
+        <div><strong>Free used:</strong> you scanned 1/1 file.</div>
+        <div class="muted" style="margin-top:6px">
+          To upload more files or combine statements, <a href="https://yayabough.gumroad.com/l/subs-finder" target="_blank" rel="noopener"><b>Buy Pro</b></a>.
+        </div>`;
+    }
+  }else{
+    input.disabled = false;
+    scan.disabled  = false;
+  }
+}
+
 /* ===== Utilities ===== */
 function log(msg){ const el=document.getElementById('log'); if(!el) return; el.textContent += (el.textContent?'\n':'') + msg; }
-function esc(s){ return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt'}[c] || c)); }
+function esc(s){ return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c] || c)); }
 function fmtDate(d){ return d? new Date(d).toISOString().slice(0,10):''; }
 function round(n){ return Math.round(n*100)/100; }
 function daysBetween(a,b){ return Math.max(1, Math.round((b-a)/86400000)); }
@@ -558,10 +585,8 @@ function standardizeFromCSVRows(rows){
 
 /* ===== Demo data ===== */
 function demoData(){
-  // helper: days ago
   const ago = (n)=>{ const d=new Date(); d.setDate(d.getDate()-n); return d; };
   const rows = [
-    // Recurring examples (monthly-ish)
     {date:ago(5),  amount:12.99, desc:'Spotify P1234 CANADA'},
     {date:ago(35), amount:12.99, desc:'Spotify P5678 CANADA'},
     {date:ago(65), amount:12.99, desc:'Spotify P9101 CANADA'},
@@ -574,11 +599,10 @@ function demoData(){
     {date:ago(40), amount:39.00, desc:'Gym-Membership CityFit'},
     {date:ago(70), amount:39.00, desc:'Gym-Membership CityFit'},
 
-    // Weird / anomalies
-    {date:ago(3),  amount:120.00, desc:'UBER   *TRIP 9F2XZ'},                 // high one-off
-    {date:ago(2),  amount:14.99,  desc:'PP* ORDER #A919203'},                 // unclear descriptor
-    {date:ago(2),  amount:14.99,  desc:'PP* ORDER #A919204'},                 // burst
-    {date:ago(2),  amount:3.00,   desc:'TinyCharge'},                         // micro-split set
+    {date:ago(3),  amount:120.00, desc:'UBER   *TRIP 9F2XZ'},
+    {date:ago(2),  amount:14.99,  desc:'PP* ORDER #A919203'},
+    {date:ago(2),  amount:14.99,  desc:'PP* ORDER #A919204'},
+    {date:ago(2),  amount:3.00,   desc:'TinyCharge'},
     {date:ago(2),  amount:2.50,   desc:'TinyCharge'},
     {date:ago(1),  amount:2.00,   desc:'TinyCharge'}
   ];
@@ -604,6 +628,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (PRO) elIn.setAttribute('multiple',''); else elIn.removeAttribute('multiple');
 
   showTrialNote();
+  applyFreeLockUI(); // ==== FREE LOCK (apply on load)
+
+  // Block picker if already locked
+  elIn.addEventListener('click', (e)=>{ if (isFreeLocked()){ e.preventDefault(); e.stopPropagation(); alert('Free limit reached (1 file total). Buy Pro for unlimited.'); }});
+  elIn.addEventListener('change',(e)=>{ if (isFreeLocked()){ e.target.value=''; }});
 
   // Privacy modal
   const modal=document.getElementById('modal');
@@ -636,6 +665,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Scan
   elBtn?.addEventListener('click', async ()=>{
+    if (isFreeLocked() && !PRO){ alert('Free limit reached (1 file total). Buy Pro for unlimited.'); return; } // ==== FREE LOCK (guard)
+
     const files=Array.from(elIn.files||[]);
     const gate = canScan(files.length);
     if(!gate.ok){
@@ -663,7 +694,11 @@ document.addEventListener('DOMContentLoaded', () => {
     elSaveBanner.style.display='none';
     render(all);
 
-    if(!PRO){ bumpFileCount(); showTrialNote(); }
+    if(!PRO){
+      bumpFileCount();
+      showTrialNote();
+      applyFreeLockUI(); // ==== FREE LOCK (lock immediately after first scan)
+    }
   });
 
   // Exports (Pro only)
